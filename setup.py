@@ -1,79 +1,51 @@
-import shutil, os, re
 from setuptools import setup, find_packages
 
-app_name = 'django-chronograph'
+import chronograph
+import os
+import urllib
 
-def get_svn_revision(path=None):
-    rev = None
-    entries_path = '%s/.svn/entries' % path
-
-    if os.path.exists(entries_path):
-        entries = open(entries_path, 'r').read()
-        # Versions >= 7 of the entries file are flat text.  The first line is
-        # the version number. The next set of digits after 'dir' is the revision.
-        if re.match('(\d+)', entries):
-            rev_match = re.search('\d+\s+dir\s+(\d+)', entries)
-            if rev_match:
-                rev = rev_match.groups()[0]
-        # Older XML versions of the file specify revision as an attribute of
-        # the first entries node.
-        else:
-            from xml.dom import minidom
-            dom = minidom.parse(entries_path)
-            rev = dom.getElementsByTagName('entry')[0].getAttribute('revision')
-
-    if rev:
-        return u'svn-r%s' % rev
-    return u'svn-unknown'
-
-def fullsplit(path, result=None):
+def setup_distribute():
     """
-    Split a pathname into components (the opposite of os.path.join) in a
-    platform-neutral way.
+    This will download and install Distribute.
     """
-    if result is None:
-        result = []
-    head, tail = os.path.split(path)
-    if head == '':
-        return [tail] + result
-    if head == path:
-        return result
-    return fullsplit(head, [tail] + result)
+    try:
+        import distribute_setup
+    except:
+        # Make sure we have Distribute
+        if not os.path.exists('distribute_setup'):
+            urllib.urlretrieve('http://nightly.ziade.org/distribute_setup.py',
+                               './distribute_setup.py')
+        distribute_setup = __import__('distribute_setup')
+    distribute_setup.use_setuptools()
 
-packages, data_files = [], []
-root_dir = os.path.dirname(__file__)
-if not root_dir:
-    root_dir = '.'
+def get_reqs(reqs=[]):
+    # optparse is included with Python <= 2.7, but has been deprecated in favor
+    # of argparse.  We try to import argparse and if we can't, then we'll add
+    # it to the requirements
+    try:
+        import argparse
+    except ImportError:
+        reqs.append("argparse>=1.1")
+    return reqs
 
-src_dir = os.path.join(root_dir, app_name)
-pieces = fullsplit(root_dir)
-if pieces[-1] == '':
-    len_root_dir = len(pieces) - 1
-else:
-    len_root_dir = len(pieces)
-
-for dirpath, dirnames, filenames in os.walk(src_dir):
-    # Ignore dirnames that start with '.'
-    for i, dirname in enumerate(dirnames):
-        if dirname.startswith('.'):
-            del dirnames[i]
-    #if 'conf' in dirpath:
-    #    print dirpath
-    if '__init__.py' in filenames and not 'conf' in dirpath:
-        packages.append('.'.join(fullsplit(dirpath)[len_root_dir:]))
-    elif filenames:
-        data_files.append([dirpath, [os.path.join(dirpath, f) for f in filenames]])
+# Make sure we have Distribute installed
+setup_distribute()
 
 setup(
-    name=app_name,
-    version=get_svn_revision(root_dir),
-    description='Django chronograph application.',
-    author='Weston Nielson',
-    author_email='wnielson@gmail.com',
-    packages = packages,
-    data_files = data_files,
-    classifiers=[
-        'Development Status :: 3 - Alpha',
+    name = "django-chronograph",
+    version = ".".join([str(i) for i in chronograph.VERSION]),
+    packages = find_packages(),
+    scripts = ['bin/chronograph'],
+    package_data = {
+        '': ['docs/*.txt', 'docs/*.py'],
+        'chronograph': ['templates/*.*', 'templates/*/*.*', 'templates/*/*/*.*', 'fixtures/*'],
+    },
+    author = "Weston Nielson",
+    author_email = "wnielson@gmail.com",
+    description = "",
+    license = "BSD",
+    url = "http://bitbucket.org/wnielson/django-chronograph",
+    classifiers = [
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
@@ -81,7 +53,7 @@ setup(
         'Programming Language :: Python',
         'Framework :: Django',
     ],
-    include_package_data=True,
-    zip_safe=False,
-    install_requires=['setuptools'],
+    zip_safe = False,
+    install_requires = get_reqs(["Django>=1.0", "python-dateutil<=1.5"]),
+    dependency_links = ['http://labix.org/download/python-dateutil/python-dateutil-1.5.tar.gz']
 )
